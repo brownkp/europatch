@@ -14,8 +14,11 @@ def create_app():
     app = Flask(__name__)
     CORS(app)  # Enable CORS for all routes
     
-    # Configure database
-    app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'postgresql://postgres:postgres@db:5432/eurorack_patch_generator')
+    # Configure database - use SQLite instead of PostgreSQL
+    # Store the database file in a persistent volume
+    sqlite_path = os.path.join('/app', 'database', 'europatch.db')
+    os.makedirs(os.path.dirname(sqlite_path), exist_ok=True)
+    app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{sqlite_path}'
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     
     # Initialize database with app

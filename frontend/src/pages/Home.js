@@ -213,86 +213,59 @@ const Home = () => {
     setPatchResult(null);
     
     try {
-      // Mock API call - will be replaced with actual API call
-      setTimeout(() => {
-        const mockResult = {
-          modules: [
-            {
-              id: 1,
-              name: "Plaits",
-              manufacturer: "Mutable Instruments",
-              type: "Oscillator",
-              description: "Macro-oscillator with multiple synthesis models"
-            },
-            {
-              id: 2,
-              name: "Rings",
-              manufacturer: "Mutable Instruments",
-              type: "Resonator",
-              description: "Modal resonator"
-            },
-            {
-              id: 3,
-              name: "Clouds",
-              manufacturer: "Mutable Instruments",
-              type: "Granular Processor",
-              description: "Texture synthesizer"
-            }
-          ],
-          patch: {
-            title: "Ambient Pluck Texture",
-            description: "A generative patch that creates evolving plucked textures with reverberant tails. The patch uses Plaits as a sound source, Rings for resonant processing, and Clouds for granular textures.",
-            connections: [
-              {
-                source: "Plaits OUT",
-                target: "Rings IN",
-                description: "Send the oscillator signal to be processed by the resonator"
-              },
-              {
-                source: "Rings OUT",
-                target: "Clouds IN",
-                description: "Process the resonated signal through the granular texture synthesizer"
-              },
-              {
-                source: "LFO OUT",
-                target: "Plaits TIMBRE",
-                description: "Modulate the timbre of Plaits for evolving textures"
-              }
-            ],
-            knobSettings: [
-              {
-                module: "Plaits",
-                knob: "MODEL",
-                value: "Modal Resonator",
-                description: "Set to modal resonator model for plucked sounds"
-              },
-              {
-                module: "Rings",
-                knob: "POSITION",
-                value: "12 o'clock",
-                description: "Middle position for balanced excitation"
-              },
-              {
-                module: "Clouds",
-                knob: "DENSITY",
-                value: "3 o'clock",
-                description: "Higher density for more granular textures"
-              }
-            ],
-            sources: [
-              "https://forum.mutable-instruments.net/t/rings-ambient-patch/12345",
-              "https://www.reddit.com/r/modular/comments/xyz123/favorite_plaits_rings_combo"
-            ]
-          }
-        };
+      // Call the backend API to parse the ModularGrid rack
+      const response = await fetch('/api/parse-rack', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ modulargrid_url: modulargridUrl }),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Error: ${response.status} ${response.statusText}`);
+      }
+      
+      const rackData = await response.json();
+      
+      // If we have a prompt, generate a patch idea
+      let patchData = null;
+      if (patchPrompt && rackData.modules && rackData.modules.length > 0) {
+        const patchResponse = await fetch('/api/generate-patch', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            modules: rackData.modules.map(module => module.id),
+            prompt: patchPrompt,
+          }),
+        });
         
-        setPatchResult(mockResult);
-        setLoading(false);
-      }, 2000);
+        if (patchResponse.ok) {
+          patchData = await patchResponse.json();
+        }
+      }
+      
+      // Format the result to match the expected structure
+      const result = {
+        modules: rackData.modules || [],
+        patch: patchData || {
+          title: "Your Rack",
+          description: "Your ModularGrid rack has been loaded. Add a patch prompt to generate patch ideas.",
+          connections: [],
+          knobSettings: [],
+          sources: []
+        }
+      };
+      
+      setPatchResult(result);
+      setLoading(false);
       
     } catch (error) {
       console.error("Error generating patch:", error);
       setLoading(false);
+      alert(`Failed to fetch rack data: ${error.message}`);
     }
   };
   
