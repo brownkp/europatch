@@ -1,0 +1,41 @@
+version: '3'
+
+services:
+  db:
+    image: postgres:13
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=eurorack_patch_generator
+    ports:
+      - "5432:5432"
+  
+  backend:
+    build: ./backend
+    depends_on:
+      - db
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/eurorack_patch_generator
+      - FLASK_ENV=development
+      - FLASK_APP=app.py
+    ports:
+      - "5001:5001"
+    volumes:
+      - ./backend:/app
+  
+  frontend:
+    build: ./frontend
+    depends_on:
+      - backend
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - REACT_APP_API_URL=http://localhost:5001/api
+
+volumes:
+  postgres_data:
