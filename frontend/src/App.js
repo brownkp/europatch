@@ -1,53 +1,32 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import styled, { ThemeProvider } from 'styled-components';
-import GlobalStyle from './styles/globalStyles';
-import theme from './styles/theme';
-
-// Pages
-import HomePage from './pages/HomePage';
-import RackAnalysisPage from './pages/RackAnalysisPage';
-import PatchIdeasPage from './pages/PatchIdeasPage';
-import ModuleDetailPage from './pages/ModuleDetailPage';
-
-// Components
+import styled from 'styled-components';
 import Header from './components/layout/Header';
-import Footer from './components/layout/Footer';
+import Home from './pages/Home';
 
 const AppContainer = styled.div`
-  display: flex;
-  flex-direction: column;
   min-height: 100vh;
-  background-color: ${props => props.theme.colors.panelBackground};
+  background-color: #1a1a1a;
+  color: #f5f5f5;
+  font-family: 'Roboto', sans-serif;
 `;
 
-const ContentContainer = styled.main`
-  flex: 1;
-  padding: ${props => props.theme.spacing.lg};
-  max-width: 1200px;
-  margin: 0 auto;
-  width: 100%;
+const Content = styled.main`
+  padding-bottom: 2rem;
 `;
 
 function App() {
   return (
-    <ThemeProvider theme={theme}>
-      <GlobalStyle />
-      <Router>
-        <AppContainer>
-          <Header />
-          <ContentContainer>
-            <Routes>
-              <Route path="/" element={<HomePage />} />
-              <Route path="/rack/:rackId" element={<RackAnalysisPage />} />
-              <Route path="/patches/:rackId" element={<PatchIdeasPage />} />
-              <Route path="/module/:moduleId" element={<ModuleDetailPage />} />
-            </Routes>
-          </ContentContainer>
-          <Footer />
-        </AppContainer>
-      </Router>
-    </ThemeProvider>
+    <Router>
+      <AppContainer>
+        <Header />
+        <Content>
+          <Routes>
+            <Route path="/" element={<Home />} />
+          </Routes>
+        </Content>
+      </AppContainer>
+    </Router>
   );
 }
 

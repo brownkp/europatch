@@ -1,77 +1,79 @@
 #!/bin/bash
 
-# This script verifies the Docker setup for the Eurorack Patch Generator
-
-echo "Verifying Docker setup..."
-
-# Check if Docker is installed
+# Verify Docker and Docker Compose are installed
+echo "Checking Docker installation..."
 if ! command -v docker &> /dev/null; then
-    echo "Docker is not installed. Please install Docker before proceeding."
+    echo "Docker is not installed. Please install Docker first."
     exit 1
 fi
+echo "Docker is installed."
 
-# Check if Docker Compose is installed
+echo "Checking Docker Compose installation..."
 if ! command -v docker-compose &> /dev/null; then
-    echo "Docker Compose is not installed. Please install Docker Compose before proceeding."
+    echo "Docker Compose is not installed. Please install Docker Compose first."
+    exit 1
+fi
+echo "Docker Compose is installed."
+
+# Check if the containers are already running
+echo "Checking if containers are already running..."
+if docker ps | grep -q "europatch"; then
+    echo "EuroPatch containers are already running. Stopping them..."
+    docker-compose down
+fi
+
+# Start the containers
+echo "Starting EuroPatch containers..."
+docker-compose up -d
+
+# Wait for containers to be ready
+echo "Waiting for containers to be ready..."
+sleep 10
+
+# Check if all containers are running
+echo "Verifying containers are running..."
+if ! docker ps | grep -q "europatch_backend"; then
+    echo "Backend container is not running."
+    docker-compose logs backend
     exit 1
 fi
 
-# Verify directory structure
-echo "Checking directory structure..."
-MISSING_FILES=0
-
-# Check backend files
-if [ ! -f "./backend/app.py" ]; then
-    echo "Missing: backend/app.py"
-    MISSING_FILES=$((MISSING_FILES+1))
-fi
-
-if [ ! -f "./backend/models.py" ]; then
-    echo "Missing: backend/models.py"
-    MISSING_FILES=$((MISSING_FILES+1))
-fi
-
-if [ ! -f "./backend/Dockerfile" ]; then
-    echo "Missing: backend/Dockerfile"
-    MISSING_FILES=$((MISSING_FILES+1))
-fi
-
-if [ ! -f "./backend/requirements.txt" ]; then
-    echo "Missing: backend/requirements.txt"
-    MISSING_FILES=$((MISSING_FILES+1))
-fi
-
-if [ ! -f "./backend/services/modulargrid_parser.py" ]; then
-    echo "Missing: backend/services/modulargrid_parser.py"
-    MISSING_FILES=$((MISSING_FILES+1))
-fi
-
-if [ ! -f "./backend/services/patch_generator.py" ]; then
-    echo "Missing: backend/services/patch_generator.py"
-    MISSING_FILES=$((MISSING_FILES+1))
-fi
-
-# Check frontend files
-if [ ! -f "./frontend/Dockerfile" ]; then
-    echo "Missing: frontend/Dockerfile"
-    MISSING_FILES=$((MISSING_FILES+1))
-fi
-
-if [ ! -f "./frontend/package.json" ]; then
-    echo "Missing: frontend/package.json"
-    MISSING_FILES=$((MISSING_FILES+1))
-fi
-
-# Check docker-compose.yml
-if [ ! -f "./docker-compose.yml" ]; then
-    echo "Missing: docker-compose.yml"
-    MISSING_FILES=$((MISSING_FILES+1))
-fi
-
-if [ $MISSING_FILES -gt 0 ]; then
-    echo "Found $MISSING_FILES missing files. Please fix these issues before proceeding."
+if ! docker ps | grep -q "europatch_frontend"; then
+    echo "Frontend container is not running."
+    docker-compose logs frontend
     exit 1
 fi
 
-echo "All required files are present."
-echo "Docker setup verification complete. The application is ready to be started with './start.sh'."
+if ! docker ps | grep -q "europatch_db"; then
+    echo "Database container is not running."
+    docker-compose logs db
+    exit 1
+fi
+
+echo "All containers are running."
+
+# Check if the services are accessible
+echo "Checking if backend API is accessible..."
+curl -s http://localhost:5001/api/modules > /dev/null
+if [ $? -ne 0 ]; then
+    echo "Backend API is not accessible."
+    docker-compose logs backend
+    exit 1
+fi
+echo "Backend API is accessible."
+
+echo "Checking if frontend is accessible..."
+curl -s http://localhost:3000 > /dev/null
+if [ $? -ne 0 ]; then
+    echo "Frontend is not accessible."
+    docker-compose logs frontend
+    exit 1
+fi
+echo "Frontend is accessible."
+
+echo "All components are operational!"
+echo "You can access the application at: http://localhost:3000"
+
+# Keep the containers running in the background
+echo "The application is now running in the background."
+echo "To stop it, run: docker-compose down"

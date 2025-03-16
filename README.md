@@ -1,89 +1,91 @@
-# Eurorack Patch Generator
+# EuroPatch - Eurorack Synthesizer Patch Idea Generator
 
-A web application that generates Eurorack synthesizer patch ideas based on ModularGrid racks. The application allows users to submit a ModularGrid rack, looks up manuals for all modules in the rack, and scrapes forums to generate interesting patch ideas.
+EuroPatch is a web application that generates patch ideas for Eurorack synthesizers based on your ModularGrid rack and creative prompts. It analyzes your modules, looks up manuals, and scrapes forum discussions to provide intelligent patching suggestions.
 
 ## Features
 
-- **ModularGrid Integration**: Submit your ModularGrid rack URL to analyze available modules
-- **Intelligent Patch Generation**: Create contextually relevant patch ideas based on your modules
-- **Detailed Connection Explanations**: Understand why connections are needed and how they work
-- **Knob Setting Recommendations**: Get optimal settings for each module
-- **Moog-Inspired UI**: Beautiful vintage-inspired user interface
-- **Local Database Caching**: Minimizes network calls by caching module information
+- Submit your ModularGrid rack URL to analyze your available modules
+- Generate patch ideas based on text prompts (ambient, generative, percussion, etc.)
+- Get detailed connection suggestions with explanations
+- Receive knob and macro controller setting recommendations
+- View source citations from forums like Reddit and ModWiggler
+- Cached module data and forum information for fast responses
 
-## Quick Start
+## Technology Stack
 
-1. Make sure you have Docker and Docker Compose installed
-2. Clone this repository
-3. Run the start script:
+- **Frontend**: React.js with styled-components
+- **Backend**: Flask (Python) with Poetry for dependency management
+- **Database**: PostgreSQL for module and patch data storage
+- **Deployment**: Docker and Docker Compose
 
-```bash
-./start.sh
-```
+## Getting Started
 
-This will start all necessary services:
-- PostgreSQL database
-- Flask backend API
-- React frontend application
+### Prerequisites
 
-## Accessing the Application
+- Docker and Docker Compose installed on your system
+- Git for cloning the repository
 
-- Frontend: http://localhost:3000
-- Backend API: http://localhost:5001/api
+### Installation
 
-## Project Structure
+1. Clone the repository:
+   ```
+   git clone https://github.com/brownkp/europatch.git
+   cd europatch
+   ```
 
-```
-eurorack-patch-generator/
-├── backend/
-│   ├── services/
-│   │   ├── __init__.py
-│   │   ├── modulargrid_parser.py
-│   │   └── patch_generator.py
-│   ├── __init__.py
-│   ├── app.py
-│   ├── Dockerfile
-│   ├── models.py
-│   └── requirements.txt
-├── frontend/
-│   ├── public/
-│   ├── src/
-│   │   ├── components/
-│   │   ├── pages/
-│   │   ├── styles/
-│   │   ├── App.js
-│   │   └── index.js
-│   ├── Dockerfile
-│   └── package.json
-├── docker-compose.yml
-├── start.sh
-├── verify_docker_setup.sh
-└── DOCKER_SETUP.md
-```
+2. Start the application using Docker Compose:
+   ```
+   docker-compose up
+   ```
+
+3. Access the application in your browser:
+   ```
+   http://localhost:3000
+   ```
+
+## Usage
+
+1. Enter your ModularGrid rack URL (e.g., https://www.modulargrid.net/e/racks/view/123456)
+2. Provide a description of the type of patch you want to create
+3. Adjust the complexity level if desired
+4. Click "Generate Patch Ideas"
+5. Review the suggested patch connections, knob settings, and explanations
+6. Implement the patch on your physical Eurorack system
 
 ## Development
 
-The Docker setup includes volume mounts for both frontend and backend code, allowing you to make changes to the code and see them reflected immediately without rebuilding the containers.
+### Project Structure
 
-## API Endpoints
+```
+europatch/
+├── backend/             # Python Flask backend
+│   ├── src/             # Source code
+│   │   ├── api/         # API routes and app configuration
+│   │   ├── models/      # Database models
+│   │   ├── services/    # Business logic services
+│   │   └── utils/       # Utility functions
+│   ├── pyproject.toml   # Poetry dependency management
+│   └── Dockerfile       # Backend container configuration
+├── frontend/            # React.js frontend
+│   ├── src/             # Source code
+│   │   ├── components/  # React components
+│   │   ├── pages/       # Page components
+│   │   └── styles/      # CSS styles
+│   ├── package.json     # npm dependencies
+│   └── Dockerfile       # Frontend container configuration
+├── docker-compose.yml   # Multi-container configuration
+└── schema.sql           # Database schema
+```
 
-- `POST /api/rack/parse`: Parse a ModularGrid rack URL
-- `GET /api/rack/{rack_id}`: Get details about a parsed rack
-- `GET /api/module/{module_id}`: Get details about a specific module
-- `POST /api/patch/generate`: Generate patch ideas based on a rack and prompt
-- `GET /api/module/{module_id}/discussions`: Get forum discussions about a module
+### Running for Development
 
-## Technologies Used
-
-- **Frontend**: React.js with styled-components
-- **Backend**: Python/Flask
-- **Database**: PostgreSQL
-- **Containerization**: Docker & Docker Compose
-
-## Detailed Documentation
-
-For more detailed information about the Docker setup, please refer to the [Docker Setup Documentation](DOCKER_SETUP.md).
+The same `docker-compose up` command can be used for development. The application uses volume mounting to enable hot reloading of both frontend and backend code.
 
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Acknowledgments
+
+- Thanks to ModularGrid for their excellent Eurorack planning tool
+- Thanks to the Eurorack community for sharing their patching knowledge
