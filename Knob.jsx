@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import styled from 'styled-components';
 
 const KnobContainer = styled.div`
@@ -60,7 +60,7 @@ const KnobValue = styled.div`
 `;
 
 /**
- * Moog-inspired knob component for Eurorack patch generator
+ * Vintage synthesizer-inspired knob component for Eurorack patch generator
  * 
  * @param {Object} props - Component props
  * @param {number} props.min - Minimum value (default: 0)

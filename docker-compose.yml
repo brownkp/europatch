@@ -29,8 +29,8 @@ services:
       - "5001:5001"
     volumes:
       - ./backend:/app
-    command: gunicorn --bind 0.0.0.0:5001 src.main:create_app()
-  
+    command: ["sh", "/app/entrypoint.sh"]
+
   frontend:
     build: ./frontend
     depends_on:
