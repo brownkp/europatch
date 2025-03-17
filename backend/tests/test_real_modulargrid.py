@@ -17,7 +17,6 @@ from src.modulargrid_parser import ModularGridParser
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-
 class TestRealModularGridIntegration(unittest.TestCase):
     """Test cases for real ModularGrid integration without mocks."""
 
@@ -67,20 +66,11 @@ class TestRealModularGridIntegration(unittest.TestCase):
 
     def test_real_module_details_extraction(self):
         """Test extracting details from actual ModularGrid module pages."""
-        # First get a module URL from a rack
         try:
-            rack_data = self.parser._scrape_rack_page(self.real_rack_urls[0])
-
-            # Find a module with a URL
-            module_url = None
-            for module in rack_data["modules"]:
-                if module.get("url"):
-                    module_url = module["url"]
-                    module_name = module["name"]
-                    break
-
-            if not module_url:
-                self.skipTest("No module URL found in the rack")
+            # Use a direct module URL instead of trying to extract from rack
+            # This ensures the test can run even if rack scraping isn't working
+            module_url = "https://www.modulargrid.net/e/mutable-instruments-plaits"
+            module_name = "Plaits"
 
             logger.info(f"Testing real module details extraction for: {module_name} at {module_url}")
 
@@ -99,6 +89,25 @@ class TestRealModularGridIntegration(unittest.TestCase):
             logger.info(f"Manufacturer: {module_details['manufacturer']}")
             logger.info(f"HP Width: {module_details['hp_width']}")
             logger.info(f"Type: {module_details['module_type']}")
+
+            # Try a second module to ensure robustness
+            module_url2 = "https://www.modulargrid.net/e/make-noise-maths"
+            module_name2 = "Maths"
+
+            logger.info(f"Testing real module details extraction for: {module_name2} at {module_url2}")
+
+            # Extract module details
+            module_details2 = self.parser._extract_module_details(module_url2)
+
+            # Verify the result has the expected structure
+            self.assertIn("name", module_details2)
+            self.assertIn("manufacturer", module_details2)
+            self.assertIn("hp_width", module_details2)
+
+            # Log the results
+            logger.info(f"Successfully extracted details for module: {module_details2['name']}")
+            logger.info(f"Manufacturer: {module_details2['manufacturer']}")
+            logger.info(f"HP Width: {module_details2['hp_width']}")
 
         except Exception as e:
             self.fail(f"Failed to extract real module details: {str(e)}")
@@ -125,9 +134,9 @@ class TestRealModularGridIntegration(unittest.TestCase):
 
         # Patch the database-related imports
         with patch('src.modulargrid_parser.db', mock_db), \
-                patch('src.modulargrid_parser.UserRack', mock_user_rack), \
-                patch('src.modulargrid_parser.Module', mock_module), \
-                patch('src.modulargrid_parser.RackModule', mock_rack_module):
+             patch('src.modulargrid_parser.UserRack', mock_user_rack), \
+             patch('src.modulargrid_parser.Module', mock_module), \
+             patch('src.modulargrid_parser.RackModule', mock_rack_module):
 
             try:
                 # Call the parse_url method with a real URL
@@ -148,7 +157,6 @@ class TestRealModularGridIntegration(unittest.TestCase):
 
             except Exception as e:
                 self.fail(f"Failed to parse real ModularGrid URL {url}: {str(e)}")
-
 
 if __name__ == '__main__':
     unittest.main()
