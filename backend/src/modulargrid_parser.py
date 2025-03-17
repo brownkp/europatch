@@ -149,14 +149,7 @@ class ModularGridParser:
 
             # If no modules exist in the database, create some default ones
             if not modules:
-                default_modules = [
-                    {"name": "Plaits", "manufacturer": "Mutable Instruments", "type": "Oscillator", "hp": 12,
-                     "description": "Macro-oscillator with multiple synthesis models"},
-                    {"name": "Rings", "manufacturer": "Mutable Instruments", "type": "Resonator", "hp": 14,
-                     "description": "Modal resonator"},
-                    {"name": "Clouds", "manufacturer": "Mutable Instruments", "type": "Granular Processor", "hp": 18,
-                     "description": "Texture synthesizer"}
-                ]
+                default_modules = []
 
                 for mod_data in default_modules:
                     module = Module(
@@ -310,12 +303,8 @@ class ModularGridParser:
             logger.error(f"Error scraping ModularGrid page: {str(e)}")
             # Create a fallback response with default modules
             return {
-                "rack_name": "Fallback Rack",
-                "modules": [
-                    {"name": "Plaits", "manufacturer": "Mutable Instruments", "url": None},
-                    {"name": "Rings", "manufacturer": "Mutable Instruments", "url": None},
-                    {"name": "Clouds", "manufacturer": "Mutable Instruments", "url": None}
-                ]
+                "rack_name": f"Error scraping ModularGrid page: {str(e)}",
+                "modules": []
             }
 
     def _extract_module_details(self, module_url):
