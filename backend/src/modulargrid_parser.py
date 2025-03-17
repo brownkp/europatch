@@ -3,6 +3,7 @@ Module for parsing ModularGrid rack URLs and extracting module information.
 """
 import re
 import requests
+import json
 from bs4 import BeautifulSoup
 import logging
 from src.models import db, Module, ModuleConnection, ModuleControl, UserRack, RackModule
@@ -15,34 +16,34 @@ class ModularGridParser:
     """
     Parser for ModularGrid rack URLs to extract module information.
     """
-    
+
     def __init__(self):
         """Initialize the ModularGrid parser."""
         self.base_url = "https://www.modulargrid.net"
         self.headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
         }
-    
+
     def parse_url(self, url):
         """
         Parse a ModularGrid rack URL and extract module information.
-        
+
         Args:
             url (str): ModularGrid rack URL
-            
+
         Returns:
             dict: Rack information including modules
         """
         logger.info(f"Parsing ModularGrid URL: {url}")
-        
+
         # Extract rack ID from URL
         rack_id_match = re.search(r'/racks/view/(\d+)', url)
         if not rack_id_match:
             raise ValueError("Invalid ModularGrid URL format. Expected format: https://www.modulargrid.net/e/racks/view/123456")
-        
+
         rack_id = rack_id_match.group(1)
         logger.info(f"Extracted rack ID: {rack_id}")
-        
+
         # Check if rack already exists in database
         existing_rack = UserRack.query.filter_by(modulargrid_id=rack_id).first()
         if existing_rack:
@@ -53,7 +54,7 @@ class ModularGridParser:
                 "rack_name": existing_rack.rack_name,
                 "modules": [rm.module.to_dict() for rm in existing_rack.modules]
             }
-        
+
         # Scrape the ModularGrid page to get rack information
         try:
             # Construct the full URL if needed
@@ -211,82 +212,229 @@ class ModularGridParser:
             if "ModularGrid Rack" in rack_name:
                 rack_name = rack_name.replace("ModularGrid Rack", "").strip()
 
-            # Extract modules
+            # Extract modules using JSON data
             modules = []
 
-            # Try different selectors for modules as the site structure might change
-            module_selectors = ['.module', '.modules .module-item', '.modules-list .module']
-            module_elems = []
+            try:
+                # Find the script tag with the JSON data
+                json_script = soup.find('script', {'type': 'application/json', 'data-mg-json': 'rtd'})
 
-            for selector in module_selectors:
-                module_elems = soup.select(selector)
-                if module_elems:
-                    logger.info(f"Found {len(module_elems)} modules using selector: {selector}")
-                    break
+                if json_script:
+                    logger.info("Found JSON data in the page")
+                    # Parse the JSON data
+                    rack_data = json.loads(json_script.text)
 
-            # If no modules found with selectors, try a more generic approach
-            if not module_elems:
-                logger.info("No modules found with standard selectors, trying alternative approach")
-                # Look for divs with manufacturer and module name patterns
-                potential_modules = soup.find_all(['div', 'li'], class_=lambda c: c and ('module' in c.lower()))
-                module_elems = [m for m in potential_modules if m.find(text=lambda t: t and len(t.strip()) > 0)]
+                    # Extract modules from the JSON data based on the provided structure
+                    if 'rack' in rack_data and 'Module' in rack_data['rack']:
+                        module_list = rack_data['rack']['Module']
+                        logger.info(f"Found {len(module_list)} modules in JSON data")
 
-            logger.info(f"Found {len(module_elems)} potential modules")
+                        for module_data in module_list:
+                            module_name = module_data.get('name', 'Unknown Module')
 
-            for module_elem in module_elems:
-                # Try different selectors for module name and manufacturer
-                name_elem = None
-                manufacturer_elem = None
+                            # Get manufacturer from Vendor object if available
+                            manufacturer = "Unknown Manufacturer"
+                            if 'Vendor' in module_data and 'name' in module_data['Vendor']:
+                                manufacturer = module_data['Vendor']['name']
 
-                # Try different selectors for module name
-                for name_selector in ['.module_name', '.name', 'h3', 'h4', 'strong']:
-                    name_elem = module_elem.select_one(name_selector)
-                    if name_elem and name_elem.text.strip():
-                        break
+                            # Construct module URL if we have an ID and slug
+                            module_url = None
+                            if 'id' in module_data and 'slug' in module_data:
+                                module_url = f"{self.base_url}/e/modules/view/{module_data['id']}/{module_data['slug']}"
 
-                # Try different selectors for manufacturer
-                for mfg_selector in ['.manufacturer', '.brand', '.maker', 'em', 'span']:
-                    manufacturer_elem = module_elem.select_one(mfg_selector)
-                    if manufacturer_elem and manufacturer_elem.text.strip():
-                        break
+                            # Extract all available fields
+                            module_info = {
+                                "name": module_name,
+                                "manufacturer": manufacturer,
+                                "url": module_url,
+                                "id": module_data.get('id'),
+                                "slug": module_data.get('slug'),
+                                "hp_width": module_data.get('te'),
+                                "description": module_data.get('description'),
+                                "depth": module_data.get('depth'),
+                                "price_eur": module_data.get('price_eur'),
+                                "price_usd": module_data.get('price_usd'),
+                                "price_base": module_data.get('price_base'),
+                                "current_5v": module_data.get('current5v'),
+                                "current_plus": module_data.get('current_plus'),
+                                "current_min": module_data.get('current_min'),
+                                "is_passive": module_data.get('is_passive'),
+                                "is_1u": module_data.get('is_1u'),
+                                "module_type": module_data.get('description', '').split(' ', 1)[0] if module_data.get('description') else 'Unknown'
+                            }
 
-                # If we couldn't find structured elements, try to extract from text
-                if not name_elem or not manufacturer_elem:
-                    text = module_elem.get_text(separator=' ', strip=True)
-                    if ' by ' in text:
-                        parts = text.split(' by ', 1)
-                        module_name = parts[0].strip()
-                        manufacturer = parts[1].strip()
+                            # Add position information if available
+                            if 'ModulesRack' in module_data:
+                                module_info.update({
+                                    "position_row": module_data['ModulesRack'].get('row'),
+                                    "position_col": module_data['ModulesRack'].get('col'),
+                                    "orientation": module_data['ModulesRack'].get('orientation')
+                                })
+
+                            # Add image information if available
+                            if 'Version' in module_data and len(module_data['Version']) > 0:
+                                first_version = module_data['Version'][0]
+                                if 'imageid' in first_version and 'imagehash' in first_version:
+                                    module_info["image_url"] = f"{self.base_url}/images/modules/large/{first_version['imageid']}.jpg"
+
+                            modules.append(module_info)
                     else:
-                        # Make a best guess
-                        words = text.split()
-                        if len(words) >= 2:
-                            manufacturer = words[0]
-                            module_name = ' '.join(words[1:])
-                        else:
-                            module_name = text
-                            manufacturer = "Unknown"
+                        logger.warning("No modules found in JSON data")
                 else:
-                    module_name = name_elem.text.strip()
-                    manufacturer = manufacturer_elem.text.strip()
+                    logger.warning("No JSON data found in the page, falling back to HTML parsing")
+                    # Fall back to the original HTML parsing method if JSON data is not available
 
-                # Extract module URL if available
-                module_url = None
-                link_elem = module_elem.find('a')
-                if link_elem and 'href' in link_elem.attrs:
-                    href = link_elem['href']
-                    if href.startswith('/'):
-                        module_url = self.base_url + href
-                    elif href.startswith('http'):
-                        module_url = href
+                    # Try different selectors for modules as the site structure might change
+                    module_selectors = ['.module', '.modules .module-item', '.modules-list .module']
+                    module_elems = []
 
-                # Only add if we have at least a name
-                if module_name:
-                    modules.append({
-                        "name": module_name,
-                        "manufacturer": manufacturer,
-                        "url": module_url
-                    })
+                    for selector in module_selectors:
+                        module_elems = soup.select(selector)
+                        if module_elems:
+                            logger.info(f"Found {len(module_elems)} modules using selector: {selector}")
+                            break
+
+                    # If no modules found with selectors, try a more generic approach
+                    if not module_elems:
+                        logger.info("No modules found with standard selectors, trying alternative approach")
+                        # Look for divs with manufacturer and module name patterns
+                        potential_modules = soup.find_all(['div', 'li'], class_=lambda c: c and ('module' in c.lower()))
+                        module_elems = [m for m in potential_modules if m.find(text=lambda t: t and len(t.strip()) > 0)]
+
+                    logger.info(f"Found {len(module_elems)} potential modules")
+
+                    for module_elem in module_elems:
+                        # Try different selectors for module name and manufacturer
+                        name_elem = None
+                        manufacturer_elem = None
+
+                        # Try different selectors for module name
+                        for name_selector in ['.module_name', '.name', 'h3', 'h4', 'strong']:
+                            name_elem = module_elem.select_one(name_selector)
+                            if name_elem and name_elem.text.strip():
+                                break
+
+                        # Try different selectors for manufacturer
+                        for mfg_selector in ['.manufacturer', '.brand', '.maker', 'em', 'span']:
+                            manufacturer_elem = module_elem.select_one(mfg_selector)
+                            if manufacturer_elem and manufacturer_elem.text.strip():
+                                break
+
+                        # If we couldn't find structured elements, try to extract from text
+                        if not name_elem or not manufacturer_elem:
+                            text = module_elem.get_text(separator=' ', strip=True)
+                            if ' by ' in text:
+                                parts = text.split(' by ', 1)
+                                module_name = parts[0].strip()
+                                manufacturer = parts[1].strip()
+                            else:
+                                # Make a best guess
+                                words = text.split()
+                                if len(words) >= 2:
+                                    manufacturer = words[0]
+                                    module_name = ' '.join(words[1:])
+                                else:
+                                    module_name = text
+                                    manufacturer = "Unknown"
+                        else:
+                            module_name = name_elem.text.strip()
+                            manufacturer = manufacturer_elem.text.strip()
+
+                        # Extract module URL if available
+                        module_url = None
+                        link_elem = module_elem.find('a')
+                        if link_elem and 'href' in link_elem.attrs:
+                            href = link_elem['href']
+                            if href.startswith('/'):
+                                module_url = self.base_url + href
+                            elif href.startswith('http'):
+                                module_url = href
+
+                        # Only add if we have at least a name
+                        if module_name:
+                            modules.append({
+                                "name": module_name,
+                                "manufacturer": manufacturer,
+                                "url": module_url
+                            })
+            except Exception as e:
+                logger.error(f"Error extracting modules from JSON: {str(e)}")
+                logger.info("Falling back to HTML parsing method")
+
+                # Fall back to the original HTML parsing method
+                # Try different selectors for modules as the site structure might change
+                module_selectors = ['.module', '.modules .module-item', '.modules-list .module']
+                module_elems = []
+
+                for selector in module_selectors:
+                    module_elems = soup.select(selector)
+                    if module_elems:
+                        logger.info(f"Found {len(module_elems)} modules using selector: {selector}")
+                        break
+
+                # If no modules found with selectors, try a more generic approach
+                if not module_elems:
+                    logger.info("No modules found with standard selectors, trying alternative approach")
+                    # Look for divs with manufacturer and module name patterns
+                    potential_modules = soup.find_all(['div', 'li'], class_=lambda c: c and ('module' in c.lower()))
+                    module_elems = [m for m in potential_modules if m.find(text=lambda t: t and len(t.strip()) > 0)]
+
+                logger.info(f"Found {len(module_elems)} potential modules")
+
+                for module_elem in module_elems:
+                    # Process each module element as in the original code
+                    name_elem = None
+                    manufacturer_elem = None
+
+                    # Try different selectors for module name
+                    for name_selector in ['.module_name', '.name', 'h3', 'h4', 'strong']:
+                        name_elem = module_elem.select_one(name_selector)
+                        if name_elem and name_elem.text.strip():
+                            break
+
+                    # Try different selectors for manufacturer
+                    for mfg_selector in ['.manufacturer', '.brand', '.maker', 'em', 'span']:
+                        manufacturer_elem = module_elem.select_one(mfg_selector)
+                        if manufacturer_elem and manufacturer_elem.text.strip():
+                            break
+
+                    # Extract name and manufacturer
+                    if not name_elem or not manufacturer_elem:
+                        text = module_elem.get_text(separator=' ', strip=True)
+                        if ' by ' in text:
+                            parts = text.split(' by ', 1)
+                            module_name = parts[0].strip()
+                            manufacturer = parts[1].strip()
+                        else:
+                            # Make a best guess
+                            words = text.split()
+                            if len(words) >= 2:
+                                manufacturer = words[0]
+                                module_name = ' '.join(words[1:])
+                            else:
+                                module_name = text
+                                manufacturer = "Unknown"
+                    else:
+                        module_name = name_elem.text.strip()
+                        manufacturer = manufacturer_elem.text.strip()
+
+                    # Extract module URL if available
+                    module_url = None
+                    link_elem = module_elem.find('a')
+                    if link_elem and 'href' in link_elem.attrs:
+                        href = link_elem['href']
+                        if href.startswith('/'):
+                            module_url = self.base_url + href
+                        elif href.startswith('http'):
+                            module_url = href
+
+                    # Only add if we have at least a name
+                    if module_name:
+                        modules.append({
+                            "name": module_name,
+                            "manufacturer": manufacturer,
+                            "url": module_url
+                        })
 
             logger.info(f"Successfully extracted {len(modules)} modules from rack")
 

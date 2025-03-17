@@ -27,5 +27,10 @@ def init_db():
         db.create_all()
         print("Database initialized successfully!")
 
-if __name__ == "__main__":
+
+def main():
     init_db()
+
+
+if __name__ == "__main__":
+    main()
